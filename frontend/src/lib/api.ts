@@ -109,6 +109,88 @@ export interface BacktestResult {
   draw_rate: number
 }
 
+export interface ScorerRow {
+  scorer: string
+  team: string
+  goals: number
+  penalties: number
+  first_goal: string
+  last_goal: string
+}
+
+export interface PlayerProfile {
+  scorer: string
+  team: string
+  goals: number
+  penalties: number
+  first_goal: string
+  last_goal: string
+  minute_distribution: { period: string; goals: number }[]
+  favourite_opponents: { opponent: string; goals: number }[]
+}
+
+export interface TeamScoring {
+  team: string
+  total_goals: number
+  distinct_scorers: number
+  top_scorers: { scorer: string; goals: number }[]
+  top_scorer_share: number
+  concentration_hhi: number
+  penalty_share: number
+}
+
+export interface XgCompetition {
+  competition: string
+  season: string
+  matches: number
+  date_from: string
+  date_to: string
+}
+
+export interface XgTeamRow {
+  team: string
+  matches: number
+  shots: number
+  goals: number
+  xg_for: number
+  goals_against: number
+  xg_against: number
+  finishing_delta: number
+}
+
+export interface XgPlayerRow {
+  player: string
+  team: string
+  shots: number
+  goals: number
+  xg: number
+  penalty_shots: number
+  finishing_delta: number
+}
+
+export interface XgMatchInfo {
+  match_id: number
+  date: string
+  stage: string | null
+  home_team: string
+  away_team: string
+  home_score: number
+  away_score: number
+  stadium: string | null
+}
+
+export interface Shot {
+  team: string
+  player: string
+  minute: number
+  x: number
+  y: number
+  xg: number
+  outcome: string
+  body_part: string | null
+  play_type: string | null
+}
+
 export class ApiError extends Error {
   status: number
   constructor(status: number, detail: string) {
@@ -153,4 +235,20 @@ export const api = {
   predict: (home: string, away: string, group: string, neutral: boolean) =>
     get<Prediction>('/api/predict', { home, away, group, neutral }),
   backtest: () => get<{ results: BacktestResult[]; notes: string }>('/api/model/backtest'),
+  topScorers: (team?: string, since?: string, limit = 30) =>
+    get<{ scorers: ScorerRow[] }>('/api/players/top-scorers', { team, since, limit }),
+  playerProfile: (scorer: string) =>
+    get<PlayerProfile>(`/api/players/${encodeURIComponent(scorer)}`),
+  teamScoring: (team: string, since?: string) =>
+    get<TeamScoring>(`/api/teams/${encodeURIComponent(team)}/scoring`, { since }),
+  xgCompetitions: () => get<{ competitions: XgCompetition[] }>('/api/xg/competitions'),
+  xgTeams: (competition: string, season: string) =>
+    get<{ teams: XgTeamRow[] }>('/api/xg/teams', { competition, season }),
+  xgPlayers: (competition: string, season: string) =>
+    get<{ players: XgPlayerRow[] }>('/api/xg/players', { competition, season }),
+  xgMatches: (competition: string, season: string) =>
+    get<{ matches: XgMatchInfo[] }>('/api/xg/matches', { competition, season }),
+  xgMatch: (matchId: number) =>
+    get<{ match: XgMatchInfo; shots: Shot[]; xg_totals: Record<string, number> }>(
+      `/api/xg/match/${matchId}`),
 }

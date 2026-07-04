@@ -44,8 +44,7 @@ def run_group(conn, group: str) -> list[dict]:
         return []
 
     model = ml.train([X[i] for i in train_idx], [y[i] for i in train_idx])
-    ml_probs_all = model.predict_proba([X[i] for i in test_idx])
-    class_pos = {c: j for j, c in enumerate(model.classes_)}
+    ml_probs_all = ml.probs_batch(model, [X[i] for i in test_idx])
 
     train_y = [y[i] for i in train_idx]
     n_train = len(train_y)
@@ -59,7 +58,7 @@ def run_group(conn, group: str) -> list[dict]:
     dc_params = None
     next_refit: dt.date | None = None
 
-    for row, mlp_raw in zip(test_idx, ml_probs_all):
+    for row, mlp in zip(test_idx, ml_probs_all):
         date = dt.date.fromisoformat(dates[row])
         if next_refit is None or date >= next_refit:
             dc_params = dixon_coles.fit_group(conn, group, as_of=date,
@@ -75,7 +74,6 @@ def run_group(conn, group: str) -> list[dict]:
         e = elo.expected_score(elo.rating_diff(
             X[row][0], X[row][1], neutral, home_adv))
         elo_probs = _wdl_from_elo(e, draw_rate)
-        mlp = tuple(mlp_raw[class_pos[c]] if c in class_pos else 0.0 for c in ml.CLASSES)
         ens = tuple((a + b) / 2 for a, b in zip(dc_probs, mlp))
 
         outcome = y[row]

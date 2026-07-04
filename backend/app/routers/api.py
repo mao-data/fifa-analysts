@@ -6,7 +6,7 @@ from typing import Iterator
 from fastapi import APIRouter, Depends, HTTPException, Query
 
 from ..analytics import predict as predict_mod
-from ..analytics import stats, standings
+from ..analytics import players, stats, standings, xg
 from ..db import get_conn
 from ..etl.leagues import LEAGUES
 
@@ -113,6 +113,63 @@ def predict(home: str, away: str, group: str, neutral: bool = False, conn=Depend
     if res is None:
         raise HTTPException(
             404, "not enough recent data for one of the teams — check names via /api/teams")
+    return res
+
+
+@router.get("/players/top-scorers")
+def top_scorers(team: str | None = None, since: str | None = None,
+                limit: int = Query(30, le=100), conn=Depends(db)):
+    return {"team": team, "since": since,
+            "scorers": players.top_scorers(conn, team, limit, since)}
+
+
+@router.get("/players/{scorer}")
+def player_profile(scorer: str, conn=Depends(db)):
+    res = players.player_profile(conn, scorer)
+    if res is None:
+        raise HTTPException(404, f"no goals recorded for '{scorer}'")
+    return res
+
+
+@router.get("/teams/{team}/scoring")
+def team_scoring(team: str, since: str | None = None, conn=Depends(db)):
+    res = players.team_scoring(conn, team, since)
+    if res is None:
+        raise HTTPException(404, f"no goal records for '{team}'")
+    return res
+
+
+@router.get("/xg/competitions")
+def xg_competitions(conn=Depends(db)):
+    return {"competitions": xg.competitions(conn)}
+
+
+@router.get("/xg/teams")
+def xg_teams(competition: str, season: str, conn=Depends(db)):
+    rows = xg.team_table(conn, competition, season)
+    if not rows:
+        raise HTTPException(404, "no shot data — run 'python -m app.etl.cli statsbomb'")
+    return {"competition": competition, "season": season, "teams": rows}
+
+
+@router.get("/xg/players")
+def xg_players(competition: str, season: str, limit: int = Query(30, le=100),
+               conn=Depends(db)):
+    return {"competition": competition, "season": season,
+            "players": xg.player_table(conn, competition, season, limit)}
+
+
+@router.get("/xg/matches")
+def xg_matches(competition: str, season: str, conn=Depends(db)):
+    return {"competition": competition, "season": season,
+            "matches": xg.match_list(conn, competition, season)}
+
+
+@router.get("/xg/match/{match_id}")
+def xg_match(match_id: int, conn=Depends(db)):
+    res = xg.match_shots(conn, match_id)
+    if res is None:
+        raise HTTPException(404, f"no match {match_id}")
     return res
 
 

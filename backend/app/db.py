@@ -62,6 +62,55 @@ CREATE TABLE IF NOT EXISTS dc_params (
     params       TEXT NOT NULL             -- JSON: attack/defence/home_adv/rho
 );
 
+CREATE TABLE IF NOT EXISTS goals (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    date        TEXT NOT NULL,
+    home_team   TEXT NOT NULL,
+    away_team   TEXT NOT NULL,
+    team        TEXT NOT NULL,             -- the scoring team
+    scorer      TEXT NOT NULL,
+    minute      INTEGER,
+    own_goal    INTEGER NOT NULL DEFAULT 0,
+    penalty     INTEGER NOT NULL DEFAULT 0
+);
+CREATE INDEX IF NOT EXISTS idx_goals_team ON goals(team);
+CREATE INDEX IF NOT EXISTS idx_goals_scorer ON goals(scorer);
+
+CREATE TABLE IF NOT EXISTS sb_matches (
+    match_id    INTEGER PRIMARY KEY,
+    competition TEXT NOT NULL,
+    season      TEXT NOT NULL,
+    date        TEXT NOT NULL,
+    stage       TEXT,
+    home_team   TEXT NOT NULL,
+    away_team   TEXT NOT NULL,
+    home_score  INTEGER NOT NULL,
+    away_score  INTEGER NOT NULL,
+    stadium     TEXT
+);
+
+CREATE TABLE IF NOT EXISTS sb_shots (
+    match_id    INTEGER NOT NULL REFERENCES sb_matches(match_id),
+    team        TEXT NOT NULL,
+    player      TEXT NOT NULL,
+    minute      INTEGER NOT NULL,
+    x           REAL NOT NULL,             -- StatsBomb pitch coords (120 x 80)
+    y           REAL NOT NULL,
+    xg          REAL NOT NULL,
+    outcome     TEXT NOT NULL,             -- 'Goal', 'Saved', 'Off T', …
+    body_part   TEXT,
+    play_type   TEXT                       -- 'Open Play', 'Penalty', …
+);
+CREATE INDEX IF NOT EXISTS idx_sb_shots_match ON sb_shots(match_id);
+
+CREATE TABLE IF NOT EXISTS market_values (
+    rating_group TEXT NOT NULL,
+    team        TEXT NOT NULL,             -- canonical name matching matches table
+    date        TEXT NOT NULL,             -- valuation snapshot date
+    squad_value REAL NOT NULL,             -- total squad market value, EUR
+    PRIMARY KEY (rating_group, team, date)
+);
+
 CREATE TABLE IF NOT EXISTS ml_team_state (
     rating_group TEXT NOT NULL,
     team        TEXT NOT NULL,

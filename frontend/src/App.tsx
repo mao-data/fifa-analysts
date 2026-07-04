@@ -5,6 +5,8 @@ import H2HPage from './pages/H2H'
 import StandingsPage from './pages/Standings'
 import RankingsPage from './pages/Rankings'
 import PredictPage from './pages/Predict'
+import PlayersPage from './pages/Players'
+import XgLabPage from './pages/XgLab'
 import { useApi } from './lib/useApi'
 import { api } from './lib/api'
 
@@ -15,6 +17,8 @@ const NAV = [
   { to: '/standings', label: 'Standings' },
   { to: '/rankings', label: 'Elo rankings' },
   { to: '/predict', label: 'Predict' },
+  { to: '/players', label: 'Players' },
+  { to: '/xg', label: 'xG Lab' },
 ]
 
 export default function App() {
@@ -43,6 +47,8 @@ export default function App() {
         <Route path="/standings" element={<StandingsPage groups={groups} />} />
         <Route path="/rankings" element={<RankingsPage groups={groups} />} />
         <Route path="/predict" element={<PredictPage groups={groups} />} />
+        <Route path="/players" element={<PlayersPage groups={groups} />} />
+        <Route path="/xg" element={<XgLabPage />} />
       </Routes>
     </div>
   )

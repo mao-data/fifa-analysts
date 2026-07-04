@@ -10,8 +10,10 @@
 
 | 來源 | 內容 |
 |---|---|
-| [martj42/international_results](https://github.com/martj42/international_results) | 國際賽逐場比分、賽事類型、是否中立場地 |
+| [martj42/international_results](https://github.com/martj42/international_results) | 國際賽逐場比分、賽事類型、是否中立場地；另含 4.8 萬筆進球者紀錄 |
 | [openfootball/football.json](https://github.com/openfootball/football.json) | 五大聯賽逐場比分 |
+| [statsbomb/open-data](https://github.com/statsbomb/open-data) | 射門事件含 xG（世界盃 2022、歐國盃 2024、美洲盃 2024）；`python -m app.etl.cli statsbomb` 抓取 |
+| [transfermarkt-datasets](https://github.com/dcaribou/transfermarkt-datasets)（CC0） | 球隊市值（**沙盒網路擋住**；部署後跑 `python -m app.etl.cli transfermarkt` 啟用，ML 市值特徵自動生效） |
 
 資料源介面是可插拔的（`backend/app/etl/base.py`）：之後要接即時 API（如
 football-data.org）只需新增一個 `fetch()` 實作並在 `cli.py` 註冊。
@@ -58,6 +60,17 @@ npm run dev                          # http://localhost:5173（/api 會 proxy �
   參考結果：國際賽命中率約 60.5–60.8%、五大聯賽 52–56%，都明顯優於
   「永遠猜主隊」基準線；Dixon-Coles/Ensemble 的 Brier（機率校準）最佳
   （國際賽 0.496 vs Elo 基線 0.517）。結果顯示在預測頁的模型比較表。
+
+## 球員與 xG 專區
+
+- **Players 頁**：國際賽射手榜（可依國家/年代篩選）、球員檔案（進球分鐘分布、
+  最愛對手、點球數）、球隊進球集中度（頭號射手佔比、HHI 指數、點球依賴度）。
+- **xG Lab 頁**：三屆大賽的球隊 xG 攻防表與 finishing ±（進球減 xG，正值=把握力
+  強或運氣好）、球員 goals vs xG 榜、單場射門地圖（點的大小=xG、實心=進球，
+  PK 大戰已排除）。
+- **市值特徵**：ML 模型內建 `mv_log_ratio` 特徵（雙方陣容市值對數比）。
+  沙盒中該欄為缺值、模型自動忽略；部署後跑 transfermarkt 指令再 `refresh`
+  重訓，特徵即生效。
 
 ## 測試
 
