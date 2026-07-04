@@ -1,0 +1,63 @@
+@import "tailwindcss";
+
+/* Design tokens from the dataviz reference palette; dark mode is a selected
+   set of steps, not an automatic flip. */
+:root {
+  --surface-1: #fcfcfb;
+  --page: #f9f9f7;
+  --ink: #0b0b0b;
+  --ink-2: #52514e;
+  --muted: #898781;
+  --grid: #e1e0d9;
+  --axis: #c3c2b7;
+  --border: rgba(11, 11, 11, 0.1);
+  --series-1: #2a78d6; /* blue   — home / primary */
+  --series-2: #1baf7a; /* aqua   — secondary */
+  --series-3: #eda100; /* yellow — draw */
+  --series-6: #e34948; /* red    — away / loss */
+  --seq-100: #cde2fb;
+  --seq-250: #86b6ef;
+  --seq-400: #3987e5;
+  --seq-550: #1c5cab;
+  --seq-700: #0d366b;
+  --good: #006300;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --surface-1: #1a1a19;
+    --page: #0d0d0d;
+    --ink: #ffffff;
+    --ink-2: #c3c2b7;
+    --muted: #898781;
+    --grid: #2c2c2a;
+    --axis: #383835;
+    --border: rgba(255, 255, 255, 0.1);
+    --series-1: #3987e5;
+    --series-2: #199e70;
+    --series-3: #c98500;
+    --series-6: #e66767;
+    --seq-100: #10315c;
+    --seq-250: #1c5cab;
+    --seq-400: #2a78d6;
+    --seq-550: #6da7ec;
+    --seq-700: #b7d3f6;
+    --good: #0ca30c;
+  }
+}
+
+body {
+  background: var(--page);
+  color: var(--ink);
+  font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+
+.card {
+  background: var(--surface-1);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+}
+
+.tabular {
+  font-variant-numeric: tabular-nums;
+}

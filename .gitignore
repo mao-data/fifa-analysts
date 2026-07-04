@@ -1,0 +1,16 @@
+# Python
+__pycache__/
+*.pyc
+.pytest_cache/
+.venv/
+
+# Data (rebuilt by `python -m app.etl.cli refresh`)
+backend/data/
+
+# Node
+node_modules/
+frontend/dist/
+
+# Misc
+.DS_Store
+*.log
