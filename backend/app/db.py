@@ -45,16 +45,46 @@ CREATE TABLE IF NOT EXISTS elo_ratings (
 );
 
 CREATE TABLE IF NOT EXISTS backtest_results (
-    rating_group TEXT PRIMARY KEY,
+    rating_group TEXT NOT NULL,
+    model        TEXT NOT NULL,            -- 'elo' | 'dixon_coles' | 'ml' | 'ensemble'
     test_from    TEXT NOT NULL,
     n_matches    INTEGER NOT NULL,
     accuracy     REAL NOT NULL,
     brier        REAL NOT NULL,
     baseline_home_accuracy REAL NOT NULL,
     baseline_brier REAL NOT NULL,
-    draw_rate    REAL NOT NULL
+    draw_rate    REAL NOT NULL,
+    PRIMARY KEY (rating_group, model)
+);
+
+CREATE TABLE IF NOT EXISTS dc_params (
+    rating_group TEXT PRIMARY KEY,
+    params       TEXT NOT NULL             -- JSON: attack/defence/home_adv/rho
+);
+
+CREATE TABLE IF NOT EXISTS ml_team_state (
+    rating_group TEXT NOT NULL,
+    team        TEXT NOT NULL,
+    elo         REAL NOT NULL,
+    form5       REAL,
+    gf10        REAL,
+    ga10        REAL,
+    last_date   TEXT,
+    n           INTEGER NOT NULL,
+    PRIMARY KEY (rating_group, team)
 );
 """
+
+SCHEMA_VERSION = 2
+
+
+def _migrate(conn: sqlite3.Connection) -> None:
+    version = conn.execute("PRAGMA user_version").fetchone()[0]
+    if version < 2:
+        # v1 backtest_results had no 'model' column; contents are rebuilt by
+        # the ETL, so dropping is safe.
+        conn.execute("DROP TABLE IF EXISTS backtest_results")
+        conn.execute(f"PRAGMA user_version = {SCHEMA_VERSION}")
 
 
 def get_conn(db_path: Path | str = DB_PATH) -> sqlite3.Connection:
@@ -64,5 +94,6 @@ def get_conn(db_path: Path | str = DB_PATH) -> sqlite3.Connection:
     # connection, so cross-thread sharing never actually happens.
     conn = sqlite3.connect(db_path, check_same_thread=False)
     conn.row_factory = sqlite3.Row
+    _migrate(conn)
     conn.executescript(SCHEMA)
     return conn

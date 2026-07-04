@@ -77,20 +77,29 @@ export interface StandingRow {
   form: string[]
 }
 
+export interface Wdl {
+  home_win: number
+  draw: number
+  away_win: number
+}
+
 export interface Prediction {
   home: string
   away: string
   group: string
   neutral: boolean
+  model_used: string
   elo: { home: number; away: number; expected_score: number }
-  lambdas: { home: number; away: number }
-  probabilities: { home_win: number; draw: number; away_win: number }
+  lambdas: { home: number; away: number } | null
+  probabilities: Wdl
+  models: { dixon_coles?: Wdl & { rho: number }; ml?: Wdl; ensemble: Wdl }
   most_likely_scores: { score: string; probability: number }[]
-  score_matrix: number[][]
+  score_matrix: number[][] | null
 }
 
 export interface BacktestResult {
   rating_group: string
+  model: 'elo' | 'dixon_coles' | 'ml' | 'ensemble'
   test_from: string
   n_matches: number
   accuracy: number

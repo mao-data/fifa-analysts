@@ -118,7 +118,9 @@ def predict(home: str, away: str, group: str, neutral: bool = False, conn=Depend
 
 @router.get("/model/backtest")
 def backtest_results(conn=Depends(db)):
-    rows = conn.execute("SELECT * FROM backtest_results ORDER BY rating_group").fetchall()
+    rows = conn.execute(
+        "SELECT * FROM backtest_results ORDER BY rating_group, model").fetchall()
     return {"results": [dict(r) for r in rows],
-            "notes": "Walk-forward Elo forecast over the last 2 years; "
-                     "brier is multiclass (0 best, 2 worst); baseline always picks home win."}
+            "notes": "Walk-forward over the last 2 years; all models scored on the "
+                     "identical match set. Brier is multiclass (0 best, 2 worst); "
+                     "baseline always picks the home team."}

@@ -16,11 +16,12 @@ export default function Dashboard({ meta }: { meta: Meta | null }) {
         <StatTile label="Competitions" value={meta ? String(meta.groups.length) : '—'}
           sub="International + top-5 leagues" />
         <StatTile label="Model accuracy (international)"
-          value={fmtPct(backtest?.results.find((r) => r.rating_group === 'international')?.accuracy)}
-          sub="Walk-forward backtest, last 2 years" />
+          value={fmtPct(backtest?.results.find(
+            (r) => r.rating_group === 'international' && r.model === 'ensemble')?.accuracy)}
+          sub="Ensemble, walk-forward backtest, last 2 years" />
         <StatTile label="Model accuracy (leagues)"
           value={fmtPct(avgLeagueAcc(backtest?.results))}
-          sub="Average across the 5 leagues" />
+          sub="Ensemble, average across the 5 leagues" />
       </div>
 
       <div className="grid gap-4 lg:grid-cols-[1fr_20rem]">
@@ -52,8 +53,9 @@ function fmtPct(x?: number | null): string {
   return x == null ? '—' : `${(x * 100).toFixed(1)}%`
 }
 
-function avgLeagueAcc(results?: { rating_group: string; accuracy: number }[]): number | null {
-  const leagues = (results ?? []).filter((r) => r.rating_group !== 'international')
+function avgLeagueAcc(results?: { rating_group: string; model: string; accuracy: number }[]): number | null {
+  const leagues = (results ?? []).filter(
+    (r) => r.rating_group !== 'international' && r.model === 'ensemble')
   if (!leagues.length) return null
   return leagues.reduce((s, r) => s + r.accuracy, 0) / leagues.length
 }

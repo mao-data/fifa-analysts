@@ -7,7 +7,7 @@ import argparse
 import sys
 import time
 
-from ..analytics import backtest, elo
+from ..analytics import backtest, dixon_coles, elo, ml
 from ..db import get_conn
 from . import base, international, leagues
 
@@ -29,14 +29,30 @@ def refresh(only: str | None = None) -> None:
         print(f"[{name}] loaded {n} matches in {time.time() - t0:.1f}s")
 
     print("[elo] rebuilding ratings…", flush=True)
-    groups = elo.rebuild_all(conn)
-    print(f"[elo] done for groups: {', '.join(sorted(groups))}")
+    groups = sorted(elo.rebuild_all(conn))
+    print(f"[elo] done for groups: {', '.join(groups)}")
 
-    print("[backtest] evaluating model…", flush=True)
+    for g in groups:
+        t0 = time.time()
+        params = dixon_coles.fit_group(conn, g)
+        if params:
+            dixon_coles.save_params(conn, g, params)
+            print(f"[dixon-coles] {g}: home_adv={params['home_adv']:.3f} "
+                  f"rho={params['rho']:.2f} ({time.time() - t0:.1f}s)")
+
+        t0 = time.time()
+        X, y, _, _, serving = ml.build_dataset(conn, g)
+        ml.save_serving_state(conn, g, serving)
+        if len(X) >= 500:
+            model = ml.train(X, y)
+            ml.save_model(model, g)
+            print(f"[ml] {g}: trained on {len(X)} matches ({time.time() - t0:.1f}s)")
+
+    print("[backtest] evaluating models (walk-forward, last 2 years)…", flush=True)
     for res in backtest.run_all(conn):
-        print(f"[backtest] {res['rating_group']}: acc={res['accuracy']:.3f} "
-              f"(baseline {res['baseline_home_accuracy']:.3f}), "
-              f"brier={res['brier']:.3f} (baseline {res['baseline_brier']:.3f}), "
+        print(f"[backtest] {res['rating_group']:14s} {res['model']:12s} "
+              f"acc={res['accuracy']:.3f} brier={res['brier']:.3f} "
+              f"(home-baseline acc={res['baseline_home_accuracy']:.3f}) "
               f"n={res['n_matches']}")
     conn.close()
 
