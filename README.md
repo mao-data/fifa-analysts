@@ -14,6 +14,7 @@
 | [openfootball/football.json](https://github.com/openfootball/football.json) | 五大聯賽逐場比分 |
 | [statsbomb/open-data](https://github.com/statsbomb/open-data) | 射門事件含 xG（世界盃 2022、歐國盃 2024、美洲盃 2024）；`python -m app.etl.cli statsbomb` 抓取 |
 | [transfermarkt-datasets](https://github.com/dcaribou/transfermarkt-datasets)（CC0） | 球隊市值（**沙盒網路擋住**；部署後跑 `python -m app.etl.cli transfermarkt` 啟用，ML 市值特徵自動生效） |
+| [football-data.co.uk](https://www.football-data.co.uk/) | 五大聯賽歷史賠率含 Pinnacle 收盤價（**沙盒網路擋住**；部署後跑 `python -m app.etl.cli odds` 啟用市場對照） |
 
 資料源介面是可插拔的（`backend/app/etl/base.py`）：之後要接即時 API（如
 football-data.org）只需新增一個 `fetch()` 實作並在 `cli.py` 註冊。
@@ -71,6 +72,17 @@ npm run dev                          # http://localhost:5173（/api 會 proxy �
 - **市值特徵**：ML 模型內建 `mv_log_ratio` 特徵（雙方陣容市值對數比）。
   沙盒中該欄為缺值、模型自動忽略；部署後跑 transfermarkt 指令再 `refresh`
   重訓，特徵即生效。
+
+## 模型成績單與市場對照
+
+- **WC 2026 頁**：模型對正在進行的 2026 世界盃的即時成績單——嚴格 walk-forward
+  （只用開賽前資料訓練），逐場預測與 ✓/✗、四模型比較、校準表（模型說 X% 時
+  實際發生 X% 嗎）。每次 `refresh` 自動更新；賽事設定在
+  `analytics/tournament_eval.py` 的 `TOURNAMENTS`，可加新賽事。
+- **市場對照**（`/api/model/market`）：把回測期間的逐場 ensemble 預測與
+  博彩公司賠率（去除 margin 後的隱含機率，優先 Pinnacle 收盤價）在**同一批
+  比賽**上對比 accuracy/Brier，並列出模型與市場分歧最大的比賽。需先在
+  可連外網的環境跑 `python -m app.etl.cli odds`。
 
 ## 測試
 

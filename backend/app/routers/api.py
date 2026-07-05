@@ -6,7 +6,7 @@ from typing import Iterator
 from fastapi import APIRouter, Depends, HTTPException, Query
 
 from ..analytics import predict as predict_mod
-from ..analytics import players, stats, standings, xg
+from ..analytics import market, players, stats, standings, tournament_eval, xg
 from ..db import get_conn
 from ..etl.leagues import LEAGUES
 
@@ -171,6 +171,23 @@ def xg_match(match_id: int, conn=Depends(db)):
     if res is None:
         raise HTTPException(404, f"no match {match_id}")
     return res
+
+
+@router.get("/model/tournament")
+def tournament_reports(conn=Depends(db)):
+    return {"reports": tournament_eval.load_all(conn)}
+
+
+@router.get("/model/market")
+def market_comparison(conn=Depends(db)):
+    results = market.compare_all(conn)
+    return {
+        "results": results,
+        "notes": ("Market probabilities are margin-stripped closing/best-available "
+                  "odds; both sides scored on identical matches from the backtest "
+                  "window. Empty until 'python -m app.etl.cli odds' has been run "
+                  "from an environment with open internet access."),
+    }
 
 
 @router.get("/model/backtest")

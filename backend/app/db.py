@@ -111,6 +111,35 @@ CREATE TABLE IF NOT EXISTS market_values (
     PRIMARY KEY (rating_group, team, date)
 );
 
+CREATE TABLE IF NOT EXISTS model_reports (
+    key         TEXT PRIMARY KEY,          -- e.g. 'wc2026'
+    report      TEXT NOT NULL              -- JSON: metrics, calibration, per-match
+);
+
+CREATE TABLE IF NOT EXISTS backtest_predictions (
+    rating_group TEXT NOT NULL,
+    date        TEXT NOT NULL,
+    home_team   TEXT NOT NULL,
+    away_team   TEXT NOT NULL,
+    p_home      REAL NOT NULL,             -- ensemble probabilities
+    p_draw      REAL NOT NULL,
+    p_away      REAL NOT NULL,
+    outcome     INTEGER NOT NULL,          -- 0 home win / 1 draw / 2 away win
+    PRIMARY KEY (rating_group, date, home_team, away_team)
+);
+
+CREATE TABLE IF NOT EXISTS odds (
+    rating_group TEXT NOT NULL,
+    date        TEXT NOT NULL,
+    home_team   TEXT NOT NULL,             -- canonical names matching matches table
+    away_team   TEXT NOT NULL,
+    book        TEXT NOT NULL,             -- 'pinnacle_closing' | 'bet365' | 'average'
+    odds_home   REAL NOT NULL,
+    odds_draw   REAL NOT NULL,
+    odds_away   REAL NOT NULL,
+    PRIMARY KEY (rating_group, date, home_team, away_team)
+);
+
 CREATE TABLE IF NOT EXISTS ml_team_state (
     rating_group TEXT NOT NULL,
     team        TEXT NOT NULL,

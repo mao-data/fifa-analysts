@@ -9,9 +9,9 @@ import argparse
 import sys
 import time
 
-from ..analytics import backtest, dixon_coles, elo, ml
+from ..analytics import backtest, dixon_coles, elo, ml, tournament_eval
 from ..db import get_conn
-from . import base, international, leagues, scorers, statsbomb, transfermarkt
+from . import base, international, leagues, odds, scorers, statsbomb, transfermarkt
 
 SOURCES = {
     "international": (international.SOURCE, international.fetch),
@@ -61,6 +61,9 @@ def refresh(only: str | None = None) -> None:
               f"acc={res['accuracy']:.3f} brier={res['brier']:.3f} "
               f"(home-baseline acc={res['baseline_home_accuracy']:.3f}) "
               f"n={res['n_matches']}")
+
+    print("[report] updating tournament report cards…", flush=True)
+    tournament_eval.run_all(conn)
     conn.close()
 
 
@@ -73,6 +76,8 @@ def main() -> None:
     sub.add_parser("transfermarkt",
                    help="download squad market values (blocked in the sandbox; "
                         "run from an environment with open internet)")
+    sub.add_parser("odds", help="download bookmaker odds from football-data.co.uk "
+                                "(blocked in the sandbox; run from open internet)")
     args = parser.parse_args()
     if args.cmd == "refresh":
         refresh(only=args.only)
@@ -93,6 +98,17 @@ def main() -> None:
             sys.exit(1)
         print("[transfermarkt] now re-run 'refresh' to retrain models with the "
               "market-value feature.")
+        conn.close()
+    elif args.cmd == "odds":
+        conn = get_conn()
+        try:
+            odds.refresh(conn)
+        except Exception as e:  # noqa: BLE001 - surface a helpful hint
+            print(f"[odds] download failed: {e}\n"
+                  "football-data.co.uk is blocked inside the Claude sandbox. Run "
+                  "this command from your own machine; /api/model/market then "
+                  "compares the market's forecasts with ours on the backtest window.")
+            sys.exit(1)
         conn.close()
     else:
         parser.print_help()

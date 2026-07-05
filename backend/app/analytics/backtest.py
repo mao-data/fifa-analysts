@@ -32,16 +32,19 @@ def _brier(probs, outcome: int) -> float:
     return sum((p - (1.0 if i == outcome else 0.0)) ** 2 for i, p in enumerate(probs))
 
 
-def run_group(conn, group: str) -> list[dict]:
+def run_group(conn, group: str) -> tuple[list[dict], list[tuple]]:
+    """Returns (per-model metric rows, per-match ensemble predictions).
+    Predictions are persisted so the market comparison (analytics/market.py)
+    can join them against bookmaker odds later without re-running models."""
     X, y, dates, meta, _ = ml.build_dataset(conn, group)
     if len(X) < MIN_TRAIN_ROWS * 2:
-        return []
+        return [], []
     last = dt.date.fromisoformat(dates[-1])
     test_from = (last - dt.timedelta(days=TEST_WINDOW_DAYS)).isoformat()
     train_idx = [i for i, d in enumerate(dates) if d < test_from]
     test_idx = [i for i, d in enumerate(dates) if d >= test_from]
     if len(train_idx) < MIN_TRAIN_ROWS or not test_idx:
-        return []
+        return [], []
 
     model = ml.train([X[i] for i in train_idx], [y[i] for i in train_idx])
     ml_probs_all = ml.probs_batch(model, [X[i] for i in test_idx])
@@ -57,6 +60,7 @@ def run_group(conn, group: str) -> list[dict]:
     base_brier = 0.0
     dc_params = None
     next_refit: dt.date | None = None
+    predictions: list[tuple] = []
 
     for row, mlp in zip(test_idx, ml_probs_all):
         date = dt.date.fromisoformat(dates[row])
@@ -77,6 +81,8 @@ def run_group(conn, group: str) -> list[dict]:
         ens = tuple((a + b) / 2 for a, b in zip(dc_probs, mlp))
 
         outcome = y[row]
+        predictions.append((group, dates[row], home, away,
+                            ens[0], ens[1], ens[2], outcome))
         for name, probs in (("elo", elo_probs), ("dixon_coles", dc_probs),
                             ("ml", mlp), ("ensemble", ens)):
             s = stats[name]
@@ -86,7 +92,7 @@ def run_group(conn, group: str) -> list[dict]:
         base_correct += outcome == 0
         base_brier += _brier(base_probs, outcome)
 
-    results = []
+    results: list[dict] = []
     for name in MODELS:
         s = stats[name]
         if not s["n"]:
@@ -102,7 +108,7 @@ def run_group(conn, group: str) -> list[dict]:
             "baseline_brier": round(base_brier / s["n"], 4),
             "draw_rate": round(draw_rate, 4),
         })
-    return results
+    return results, predictions
 
 
 def run_all(conn) -> list[dict]:
@@ -111,8 +117,13 @@ def run_all(conn) -> list[dict]:
     all_results = []
     with conn:
         conn.execute("DELETE FROM backtest_results")
+        conn.execute("DELETE FROM backtest_predictions")
         for g in sorted(groups):
-            for res in run_group(conn, g):
+            results, predictions = run_group(conn, g)
+            conn.executemany(
+                "INSERT OR REPLACE INTO backtest_predictions VALUES (?,?,?,?,?,?,?,?)",
+                predictions)
+            for res in results:
                 all_results.append(res)
                 conn.execute(
                     """INSERT INTO backtest_results (rating_group, model, test_from,

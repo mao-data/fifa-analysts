@@ -7,6 +7,7 @@ import RankingsPage from './pages/Rankings'
 import PredictPage from './pages/Predict'
 import PlayersPage from './pages/Players'
 import XgLabPage from './pages/XgLab'
+import ReportCardPage from './pages/ReportCard'
 import { useApi } from './lib/useApi'
 import { api } from './lib/api'
 
@@ -19,6 +20,7 @@ const NAV = [
   { to: '/predict', label: 'Predict' },
   { to: '/players', label: 'Players' },
   { to: '/xg', label: 'xG Lab' },
+  { to: '/report', label: 'WC 2026' },
 ]
 
 export default function App() {
@@ -49,6 +51,7 @@ export default function App() {
         <Route path="/predict" element={<PredictPage groups={groups} />} />
         <Route path="/players" element={<PlayersPage groups={groups} />} />
         <Route path="/xg" element={<XgLabPage />} />
+        <Route path="/report" element={<ReportCardPage />} />
       </Routes>
     </div>
   )

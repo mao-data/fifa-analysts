@@ -191,6 +191,31 @@ export interface Shot {
   play_type: string | null
 }
 
+export interface ReportMatch {
+  date: string
+  home: string
+  away: string
+  home_score: number
+  away_score: number
+  probs: [number, number, number]
+  predicted: number
+  outcome: number
+}
+
+export interface TournamentReport {
+  key: string
+  name: string
+  competition: string
+  since: string
+  computed_at: string
+  n_matches: number
+  models: Record<string, { accuracy: number; brier: number }>
+  baselines: { frequency_brier: number; uniform_brier: number }
+  outcome_split: [number, number, number]
+  calibration: { bucket: string; predicted: number; actual: number; n: number }[]
+  matches: ReportMatch[]
+}
+
 export class ApiError extends Error {
   status: number
   constructor(status: number, detail: string) {
@@ -248,6 +273,7 @@ export const api = {
     get<{ players: XgPlayerRow[] }>('/api/xg/players', { competition, season }),
   xgMatches: (competition: string, season: string) =>
     get<{ matches: XgMatchInfo[] }>('/api/xg/matches', { competition, season }),
+  tournamentReports: () => get<{ reports: TournamentReport[] }>('/api/model/tournament'),
   xgMatch: (matchId: number) =>
     get<{ match: XgMatchInfo; shots: Shot[]; xg_totals: Record<string, number> }>(
       `/api/xg/match/${matchId}`),
