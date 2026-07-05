@@ -92,8 +92,8 @@ def h2h(conn, team1: str, team2: str, group: str | None = None, limit: int = 20)
         params,
     ).fetchone()
     matches = conn.execute(
-        f"SELECT * FROM matches WHERE {where} ORDER BY date DESC, id DESC LIMIT {int(limit)}",
-        params,
+        f"SELECT * FROM matches WHERE {where} ORDER BY date DESC, id DESC LIMIT :limit",
+        params | {"limit": limit},
     ).fetchall()
     played = totals["played"] or 0
     t1_wins, draws = totals["t1_wins"] or 0, totals["draws"] or 0

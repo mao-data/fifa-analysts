@@ -16,9 +16,7 @@ import csv
 import difflib
 import io
 
-import requests
-
-from .base import canonical_team_name
+from .base import canonical_team_name, make_session
 
 BASE_URL = "https://www.football-data.co.uk/mmz4281"
 DIVISIONS = {"E0": "en.1", "SP1": "es.1", "D1": "de.1", "I1": "it.1", "F1": "fr.1"}
@@ -116,7 +114,7 @@ def known_teams(conn, group: str) -> set[str]:
 
 
 def refresh(conn, progress=print) -> int:
-    session = requests.Session()
+    session = make_session()
     total = 0
     with conn:
         conn.execute("DELETE FROM odds")

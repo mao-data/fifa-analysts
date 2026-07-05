@@ -3,9 +3,7 @@ Season files from 2010-11 onwards; matches without a full-time score
 (not yet played) are skipped."""
 import datetime as dt
 
-import requests
-
-from .base import MatchRow, canonical_team_name
+from .base import MatchRow, canonical_team_name, make_session
 
 BASE_URL = "https://raw.githubusercontent.com/openfootball/football.json/master"
 SOURCE = "openfootball"
@@ -62,7 +60,7 @@ def parse_season_json(data: dict, code: str, season: str) -> list[MatchRow]:
 
 def fetch(codes: list[str] | None = None) -> list[MatchRow]:
     rows: list[MatchRow] = []
-    session = requests.Session()
+    session = make_session()
     for code in codes or list(LEAGUES):
         for season in seasons():
             url = f"{BASE_URL}/{season}/{code}.json"

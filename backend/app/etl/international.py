@@ -3,16 +3,14 @@
 import csv
 import io
 
-import requests
-
-from .base import MatchRow
+from .base import MatchRow, make_session
 
 URL = "https://raw.githubusercontent.com/martj42/international_results/master/results.csv"
 SOURCE = "international"
 
 
 def fetch(url: str = URL) -> list[MatchRow]:
-    resp = requests.get(url, timeout=60)
+    resp = make_session().get(url, timeout=60)
     resp.raise_for_status()
     return parse_csv(resp.text)
 

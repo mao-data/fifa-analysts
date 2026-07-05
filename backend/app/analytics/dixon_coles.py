@@ -173,18 +173,24 @@ def predict_probs(params: dict, home: str, away: str, neutral: bool):
 
 # ---------------------------------------------------------------- persistence
 
+def load_rows(conn, group: str) -> list[tuple]:
+    """Match tuples for fit(); load once and reuse across walk-forward refits."""
+    return [(r["date"], r["home_team"], r["away_team"], r["home_score"],
+             r["away_score"], r["neutral"]) for r in conn.execute(
+        "SELECT date, home_team, away_team, home_score, away_score, neutral "
+        "FROM matches WHERE rating_group = ?", (group,))]
+
+
 def fit_group(conn, group: str, as_of: dt.date | None = None,
-              before_date: str | None = None) -> dict | None:
+              before_date: str | None = None,
+              rows: list[tuple] | None = None) -> dict | None:
     """Fit on a group's matches (optionally only those strictly before a
-    cutoff date, for walk-forward backtesting)."""
-    q = ("SELECT date, home_team, away_team, home_score, away_score, neutral "
-         "FROM matches WHERE rating_group = ?")
-    args: list = [group]
+    cutoff date, for walk-forward backtesting). Pass preloaded `rows` from
+    load_rows() to avoid re-querying on every refit."""
+    if rows is None:
+        rows = load_rows(conn, group)
     if before_date:
-        q += " AND date < ?"
-        args.append(before_date)
-    rows = [(r["date"], r["home_team"], r["away_team"], r["home_score"],
-             r["away_score"], r["neutral"]) for r in conn.execute(q, args)]
+        rows = [r for r in rows if r[0] < before_date]
     if not rows:
         return None
     if as_of is None:

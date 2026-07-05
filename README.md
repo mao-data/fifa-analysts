@@ -25,7 +25,7 @@ football-data.org）只需新增一個 `fetch()` 實作並在 `cli.py` 註冊。
 # 1) 後端：安裝依賴、抓資料（含 Elo 重建與模型回測）、啟動 API
 cd backend
 pip install -r requirements.txt
-python -m app.etl.cli refresh        # 下載約 7.5 萬場比賽，1 分鐘內完成
+python -m app.etl.cli refresh        # 下載 7.5 萬場比賽 + 重訓模型 + 回測，約 1 分鐘
 uvicorn app.main:app --port 8000     # API 文件在 http://localhost:8000/docs
 
 # 2) 前端（另開終端機）

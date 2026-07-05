@@ -18,9 +18,7 @@ import io
 import os
 from collections import defaultdict
 
-import requests
-
-from .base import canonical_team_name
+from .base import canonical_team_name, make_session
 
 BASE_URL = os.environ.get(
     "TRANSFERMARKT_DATA_URL",
@@ -32,7 +30,7 @@ COMPETITION_TO_GROUP = {
 }
 
 
-def _fetch_csv(session: requests.Session, name: str) -> list[dict]:
+def _fetch_csv(session, name: str) -> list[dict]:
     resp = session.get(f"{BASE_URL}/{name}", timeout=300)
     resp.raise_for_status()
     data = resp.content
@@ -88,7 +86,7 @@ def replace(conn, rows: list[tuple]) -> int:
 
 
 def refresh(conn, progress=print) -> int:
-    session = requests.Session()
+    session = make_session()
     progress("[transfermarkt] downloading clubs.csv…")
     clubs = _fetch_csv(session, "clubs.csv")
     progress("[transfermarkt] downloading player_valuations.csv (large)…")

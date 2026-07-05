@@ -3,7 +3,7 @@ import { api, type GroupMeta } from '../lib/api'
 import { useApi } from '../lib/useApi'
 import { Card, Empty, ErrorNote, Loading, StatTile } from '../components/ui'
 import { TeamSelect } from '../components/TeamSelect'
-import { GoalsDistChart } from '../components/charts'
+import { ColumnChart } from '../components/charts'
 
 const ERAS = [
   { label: 'All time', value: undefined },
@@ -115,8 +115,8 @@ export default function PlayersPage({ groups }: { groups: GroupMeta[] }) {
                 <h3 className="mb-1 text-xs font-semibold" style={{ color: 'var(--ink-2)' }}>
                   Goals by match period
                 </h3>
-                <GoalsDistChart data={profile.minute_distribution.map((b) => ({
-                  goals: b.period as unknown as number, matches: b.goals,
+                <ColumnChart name="goals" data={profile.minute_distribution.map((b) => ({
+                  label: b.period, value: b.goals,
                 }))} />
               </div>
               <div>

@@ -39,6 +39,9 @@ def refresh(only: str | None = None) -> None:
     groups = sorted(elo.rebuild_all(conn))
     print(f"[elo] done for groups: {', '.join(groups)}")
 
+    # Build each group's walk-forward dataset once; the serving state,
+    # backtest and tournament reports all consume the same copy.
+    datasets: dict[str, tuple] = {}
     for g in groups:
         t0 = time.time()
         params = dixon_coles.fit_group(conn, g)
@@ -48,7 +51,8 @@ def refresh(only: str | None = None) -> None:
                   f"rho={params['rho']:.2f} ({time.time() - t0:.1f}s)")
 
         t0 = time.time()
-        X, y, _, _, serving = ml.build_dataset(conn, g)
+        X, y, dates, meta, serving = ml.build_dataset(conn, g)
+        datasets[g] = (X, y, dates, meta)
         ml.save_serving_state(conn, g, serving)
         if len(X) >= 500:
             model = ml.train(X, y)
@@ -56,14 +60,14 @@ def refresh(only: str | None = None) -> None:
             print(f"[ml] {g}: trained on {len(X)} matches ({time.time() - t0:.1f}s)")
 
     print("[backtest] evaluating models (walk-forward, last 2 years)…", flush=True)
-    for res in backtest.run_all(conn):
+    for res in backtest.run_all(conn, datasets):
         print(f"[backtest] {res['rating_group']:14s} {res['model']:12s} "
               f"acc={res['accuracy']:.3f} brier={res['brier']:.3f} "
               f"(home-baseline acc={res['baseline_home_accuracy']:.3f}) "
               f"n={res['n_matches']}")
 
     print("[report] updating tournament report cards…", flush=True)
-    tournament_eval.run_all(conn)
+    tournament_eval.run_all(conn, datasets=datasets)
     conn.close()
 
 

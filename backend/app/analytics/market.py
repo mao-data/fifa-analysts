@@ -7,14 +7,13 @@ runs on the intersection of the backtest window and the odds table — both
 sides scored on identical matches."""
 
 
+from .metrics import brier, pick
+
+
 def _implied(oh: float, od: float, oa: float) -> tuple[float, float, float]:
     inv = (1 / oh, 1 / od, 1 / oa)
     s = sum(inv)
     return inv[0] / s, inv[1] / s, inv[2] / s
-
-
-def _brier(p, o: int) -> float:
-    return sum((pi - (1.0 if k == o else 0.0)) ** 2 for k, pi in enumerate(p))
 
 
 def compare(conn, group: str) -> dict | None:
@@ -39,8 +38,8 @@ def compare(conn, group: str) -> dict | None:
         market_p = _implied(r["odds_home"], r["odds_draw"], r["odds_away"])
         o = r["outcome"]
         for name, p in (("model", model_p), ("market", market_p)):
-            stats[name]["correct"] += max(range(3), key=lambda k: p[k]) == o
-            stats[name]["brier"] += _brier(p, o)
+            stats[name]["correct"] += pick(p) == o
+            stats[name]["brier"] += brier(p, o)
         gap = max(abs(a - b) for a, b in zip(model_p, market_p))
         divergences.append({
             "date": r["date"], "home": r["home_team"], "away": r["away_team"],

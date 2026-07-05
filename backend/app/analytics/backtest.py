@@ -16,11 +16,18 @@ training class frequencies / the home team.
 import datetime as dt
 
 from . import dixon_coles, elo, ml
+from .metrics import brier, pick
 
 TEST_WINDOW_DAYS = 2 * 365
 DC_REFIT_DAYS = 30
 MIN_TRAIN_ROWS = 300
 MODELS = ("elo", "dixon_coles", "ml", "ensemble")
+
+# A group's walk-forward feature dataset: (X, y, dates, meta) as returned by
+# ml.build_dataset (minus the serving state). Building one means replaying
+# every match in Python, so callers that need it for several consumers
+# (cli refresh -> backtest + tournament reports) build it once and pass it in.
+Dataset = tuple[list, list, list, list]
 
 
 def _wdl_from_elo(e: float, draw_rate: float) -> tuple[float, float, float]:
@@ -28,15 +35,15 @@ def _wdl_from_elo(e: float, draw_rate: float) -> tuple[float, float, float]:
     return w, draw_rate, 1.0 - draw_rate - w
 
 
-def _brier(probs, outcome: int) -> float:
-    return sum((p - (1.0 if i == outcome else 0.0)) ** 2 for i, p in enumerate(probs))
-
-
-def run_group(conn, group: str) -> tuple[list[dict], list[tuple]]:
-    """Returns (per-model metric rows, per-match ensemble predictions).
-    Predictions are persisted so the market comparison (analytics/market.py)
-    can join them against bookmaker odds later without re-running models."""
-    X, y, dates, meta, _ = ml.build_dataset(conn, group)
+def run_group(conn, group: str, dataset: Dataset | None = None) -> tuple[list[dict], list[tuple]]:
+    """Read-only. Returns (per-model metric rows, per-match ensemble
+    predictions). Predictions are persisted by run_all so the market
+    comparison (analytics/market.py) can join them against bookmaker odds
+    without re-running models."""
+    if dataset is None:
+        X, y, dates, meta, _ = ml.build_dataset(conn, group)
+    else:
+        X, y, dates, meta = dataset
     if len(X) < MIN_TRAIN_ROWS * 2:
         return [], []
     last = dt.date.fromisoformat(dates[-1])
@@ -61,12 +68,13 @@ def run_group(conn, group: str) -> tuple[list[dict], list[tuple]]:
     dc_params = None
     next_refit: dt.date | None = None
     predictions: list[tuple] = []
+    dc_rows = dixon_coles.load_rows(conn, group)
 
     for row, mlp in zip(test_idx, ml_probs_all):
         date = dt.date.fromisoformat(dates[row])
         if next_refit is None or date >= next_refit:
             dc_params = dixon_coles.fit_group(conn, group, as_of=date,
-                                              before_date=dates[row])
+                                              before_date=dates[row], rows=dc_rows)
             next_refit = date + dt.timedelta(days=DC_REFIT_DAYS)
         home, away = meta[row]
         neutral = bool(X[row][ml.FEATURES.index("neutral")])
@@ -87,10 +95,10 @@ def run_group(conn, group: str) -> tuple[list[dict], list[tuple]]:
                             ("ml", mlp), ("ensemble", ens)):
             s = stats[name]
             s["n"] += 1
-            s["correct"] += max(range(3), key=lambda i: probs[i]) == outcome
-            s["brier"] += _brier(probs, outcome)
+            s["correct"] += pick(probs) == outcome
+            s["brier"] += brier(probs, outcome)
         base_correct += outcome == 0
-        base_brier += _brier(base_probs, outcome)
+        base_brier += brier(base_probs, outcome)
 
     results: list[dict] = []
     for name in MODELS:
@@ -111,27 +119,29 @@ def run_group(conn, group: str) -> tuple[list[dict], list[tuple]]:
     return results, predictions
 
 
-def run_all(conn) -> list[dict]:
+def run_all(conn, datasets: dict[str, Dataset] | None = None) -> list[dict]:
+    """Evaluation is read-only and can take minutes; keep each write
+    transaction short so API readers are never blocked mid-refresh."""
     groups = [r["rating_group"] for r in
               conn.execute("SELECT DISTINCT rating_group FROM matches")]
     all_results = []
     with conn:
         conn.execute("DELETE FROM backtest_results")
         conn.execute("DELETE FROM backtest_predictions")
-        for g in sorted(groups):
-            results, predictions = run_group(conn, g)
+    for g in sorted(groups):
+        results, predictions = run_group(conn, g, (datasets or {}).get(g))
+        with conn:
             conn.executemany(
                 "INSERT OR REPLACE INTO backtest_predictions VALUES (?,?,?,?,?,?,?,?)",
                 predictions)
-            for res in results:
-                all_results.append(res)
-                conn.execute(
-                    """INSERT INTO backtest_results (rating_group, model, test_from,
-                           n_matches, accuracy, brier, baseline_home_accuracy,
-                           baseline_brier, draw_rate)
-                       VALUES (?,?,?,?,?,?,?,?,?)""",
-                    (res["rating_group"], res["model"], res["test_from"],
-                     res["n_matches"], res["accuracy"], res["brier"],
-                     res["baseline_home_accuracy"], res["baseline_brier"],
-                     res["draw_rate"]))
+            conn.executemany(
+                """INSERT INTO backtest_results (rating_group, model, test_from,
+                       n_matches, accuracy, brier, baseline_home_accuracy,
+                       baseline_brier, draw_rate)
+                   VALUES (?,?,?,?,?,?,?,?,?)""",
+                [(res["rating_group"], res["model"], res["test_from"],
+                  res["n_matches"], res["accuracy"], res["brier"],
+                  res["baseline_home_accuracy"], res["baseline_brier"],
+                  res["draw_rate"]) for res in results])
+        all_results.extend(results)
     return all_results

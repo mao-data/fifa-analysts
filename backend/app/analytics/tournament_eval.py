@@ -11,6 +11,7 @@ import json
 
 from . import dixon_coles as dc
 from . import elo, ml
+from .metrics import brier, pick
 
 # Tournaments to track. Past ones keep working as historical report cards.
 TOURNAMENTS = [
@@ -21,11 +22,8 @@ DC_REFIT_DAYS = 15
 MODELS = ("elo", "dixon_coles", "ml", "ensemble")
 
 
-def _brier(p, o: int) -> float:
-    return sum((pi - (1.0 if k == o else 0.0)) ** 2 for k, pi in enumerate(p))
-
-
-def run(conn, group: str, competition: str, since: str) -> dict | None:
+def run(conn, group: str, competition: str, since: str,
+        dataset: tuple | None = None) -> dict | None:
     keys = {(r["date"], r["home_team"], r["away_team"]): (r["home_score"], r["away_score"])
             for r in conn.execute(
                 """SELECT date, home_team, away_team, home_score, away_score
@@ -34,7 +32,10 @@ def run(conn, group: str, competition: str, since: str) -> dict | None:
     if not keys:
         return None
 
-    X, y, dates, meta, _ = ml.build_dataset(conn, group)
+    if dataset is None:
+        X, y, dates, meta, _ = ml.build_dataset(conn, group)
+    else:
+        X, y, dates, meta = dataset
     idx = [i for i in range(len(X))
            if dates[i] >= since and (dates[i], meta[i][0], meta[i][1]) in keys]
     train_idx = [i for i in range(len(X)) if dates[i] < since]
@@ -52,11 +53,13 @@ def run(conn, group: str, competition: str, since: str) -> dict | None:
     per_model = {m: {"correct": 0, "brier": 0.0} for m in MODELS}
     matches = []
     params, next_refit = None, None
+    dc_rows = dc.load_rows(conn, group)
 
     for j, i in enumerate(idx):
         date = dt.date.fromisoformat(dates[i])
         if next_refit is None or date >= next_refit:
-            params = dc.fit_group(conn, group, as_of=date, before_date=dates[i])
+            params = dc.fit_group(conn, group, as_of=date, before_date=dates[i],
+                                  rows=dc_rows)
             next_refit = date + dt.timedelta(days=DC_REFIT_DAYS)
         home, away = meta[i]
         neutral = bool(X[i][neutral_i])
@@ -74,15 +77,15 @@ def run(conn, group: str, competition: str, since: str) -> dict | None:
 
         outcome = y[i]
         for name in MODELS:
-            per_model[name]["correct"] += max(range(3), key=lambda k: probs[name][k]) == outcome
-            per_model[name]["brier"] += _brier(probs[name], outcome)
+            per_model[name]["correct"] += pick(probs[name]) == outcome
+            per_model[name]["brier"] += brier(probs[name], outcome)
         hs, as_ = keys[(dates[i], home, away)]
         ens = probs["ensemble"]
         matches.append({
             "date": dates[i], "home": home, "away": away,
             "home_score": hs, "away_score": as_,
             "probs": [round(p, 4) for p in ens],
-            "predicted": max(range(3), key=lambda k: ens[k]),
+            "predicted": pick(ens),
             "outcome": outcome,
         })
 
@@ -100,7 +103,7 @@ def run(conn, group: str, competition: str, since: str) -> dict | None:
             for name, s in per_model.items()
         },
         "baselines": {
-            "frequency_brier": round(sum(_brier(freq, o) for o in outcomes) / n, 4),
+            "frequency_brier": round(sum(brier(freq, o) for o in outcomes) / n, 4),
             "uniform_brier": round(2 / 3, 4),
         },
         "outcome_split": [outcomes.count(0), outcomes.count(1), outcomes.count(2)],
@@ -112,7 +115,7 @@ def run(conn, group: str, competition: str, since: str) -> dict | None:
 def _calibration(matches: list[dict]) -> list[dict]:
     buckets: dict[int, list[bool]] = {}
     for m in matches:
-        fav = max(range(3), key=lambda k: m["probs"][k])
+        fav = pick(m["probs"])
         b = int(m["probs"][fav] * 100) // 10 * 10
         buckets.setdefault(b, []).append(fav == m["outcome"])
     return [{"bucket": f"{b}-{b + 9}%", "predicted": (b + 5) / 100,
@@ -120,10 +123,11 @@ def _calibration(matches: list[dict]) -> list[dict]:
             for b, hits in sorted(buckets.items())]
 
 
-def run_all(conn, progress=print) -> list[str]:
+def run_all(conn, progress=print, datasets: dict | None = None) -> list[str]:
     done = []
     for t in TOURNAMENTS:
-        report = run(conn, t["group"], t["competition"], t["since"])
+        report = run(conn, t["group"], t["competition"], t["since"],
+                     dataset=(datasets or {}).get(t["group"]))
         if report is None:
             continue
         report["name"] = t["name"]

@@ -58,15 +58,19 @@ export function EloTrendChart({ series }: {
   )
 }
 
-export function GoalsDistChart({ data }: { data: { goals: number; matches: number }[] }) {
+/** Single-series column chart over categorical labels. */
+export function ColumnChart({ data, name }: {
+  data: { label: string | number; value: number }[]
+  name: string
+}) {
   return (
     <ResponsiveContainer width="100%" height={200}>
       <BarChart data={data} margin={{ top: 8, right: 8, bottom: 0, left: 0 }} barCategoryGap="25%">
         <CartesianGrid stroke="var(--grid)" strokeWidth={1} vertical={false} />
-        <XAxis dataKey="goals" tick={AXIS_TICK} stroke="var(--axis)" tickLine={false} />
+        <XAxis dataKey="label" tick={AXIS_TICK} stroke="var(--axis)" tickLine={false} />
         <YAxis tick={AXIS_TICK} stroke="var(--axis)" tickLine={false} axisLine={false} width={40} />
         <Tooltip content={<ChartTooltip />} cursor={{ fill: 'var(--grid)', opacity: 0.4 }} />
-        <Bar dataKey="matches" name="matches" fill="var(--series-1)"
+        <Bar dataKey="value" name={name} fill="var(--series-1)"
           radius={[4, 4, 0, 0]} maxBarSize={24} />
       </BarChart>
     </ResponsiveContainer>

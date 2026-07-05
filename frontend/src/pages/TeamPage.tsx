@@ -5,7 +5,7 @@ import { useApi } from '../lib/useApi'
 import { Card, Empty, ErrorNote, FormChips, Loading, MatchList, StatTile } from '../components/ui'
 import { GroupSelect } from '../components/GroupSelect'
 import { TeamSelect } from '../components/TeamSelect'
-import { EloTrendChart, GoalsDistChart } from '../components/charts'
+import { ColumnChart, EloTrendChart } from '../components/charts'
 
 export default function TeamPage({ groups }: { groups: GroupMeta[] }) {
   const [params, setParams] = useSearchParams()
@@ -59,7 +59,9 @@ export default function TeamPage({ groups }: { groups: GroupMeta[] }) {
               <MatchList matches={stats.form} perspective={stats.team} />
             </Card>
             <Card title="Goals scored per match (all time)">
-              <GoalsDistChart data={stats.goals_scored_distribution.filter((d) => d.goals <= 8)} />
+              <ColumnChart name="matches" data={stats.goals_scored_distribution
+                .filter((d) => d.goals <= 8)
+                .map((d) => ({ label: d.goals, value: d.matches }))} />
             </Card>
           </div>
         </>

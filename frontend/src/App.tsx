@@ -1,15 +1,20 @@
+import { lazy, Suspense } from 'react'
 import { NavLink, Route, Routes } from 'react-router-dom'
-import Dashboard from './pages/Dashboard'
-import TeamPage from './pages/TeamPage'
-import H2HPage from './pages/H2H'
-import StandingsPage from './pages/Standings'
-import RankingsPage from './pages/Rankings'
-import PredictPage from './pages/Predict'
-import PlayersPage from './pages/Players'
-import XgLabPage from './pages/XgLab'
-import ReportCardPage from './pages/ReportCard'
+import { Loading } from './components/ui'
 import { useApi } from './lib/useApi'
 import { api } from './lib/api'
+
+// Route-level code splitting: charts (recharts) only load with the pages
+// that use them, keeping the initial bundle small.
+const Dashboard = lazy(() => import('./pages/Dashboard'))
+const TeamPage = lazy(() => import('./pages/TeamPage'))
+const H2HPage = lazy(() => import('./pages/H2H'))
+const StandingsPage = lazy(() => import('./pages/Standings'))
+const RankingsPage = lazy(() => import('./pages/Rankings'))
+const PredictPage = lazy(() => import('./pages/Predict'))
+const PlayersPage = lazy(() => import('./pages/Players'))
+const XgLabPage = lazy(() => import('./pages/XgLab'))
+const ReportCardPage = lazy(() => import('./pages/ReportCard'))
 
 const NAV = [
   { to: '/', label: 'Dashboard' },
@@ -42,17 +47,19 @@ export default function App() {
           ))}
         </nav>
       </header>
-      <Routes>
-        <Route path="/" element={<Dashboard meta={meta} />} />
-        <Route path="/teams" element={<TeamPage groups={groups} />} />
-        <Route path="/h2h" element={<H2HPage groups={groups} />} />
-        <Route path="/standings" element={<StandingsPage groups={groups} />} />
-        <Route path="/rankings" element={<RankingsPage groups={groups} />} />
-        <Route path="/predict" element={<PredictPage groups={groups} />} />
-        <Route path="/players" element={<PlayersPage groups={groups} />} />
-        <Route path="/xg" element={<XgLabPage />} />
-        <Route path="/report" element={<ReportCardPage />} />
-      </Routes>
+      <Suspense fallback={<Loading />}>
+        <Routes>
+          <Route path="/" element={<Dashboard meta={meta} />} />
+          <Route path="/teams" element={<TeamPage groups={groups} />} />
+          <Route path="/h2h" element={<H2HPage groups={groups} />} />
+          <Route path="/standings" element={<StandingsPage groups={groups} />} />
+          <Route path="/rankings" element={<RankingsPage groups={groups} />} />
+          <Route path="/predict" element={<PredictPage groups={groups} />} />
+          <Route path="/players" element={<PlayersPage groups={groups} />} />
+          <Route path="/xg" element={<XgLabPage />} />
+          <Route path="/report" element={<ReportCardPage />} />
+        </Routes>
+      </Suspense>
     </div>
   )
 }

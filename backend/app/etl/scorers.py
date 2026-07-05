@@ -3,13 +3,13 @@ One row per goal: scorer, minute, own-goal and penalty flags."""
 import csv
 import io
 
-import requests
+from .base import make_session
 
 URL = "https://raw.githubusercontent.com/martj42/international_results/master/goalscorers.csv"
 
 
 def fetch(url: str = URL) -> list[tuple]:
-    resp = requests.get(url, timeout=60)
+    resp = make_session().get(url, timeout=60)
     resp.raise_for_status()
     return parse_csv(resp.text)
 

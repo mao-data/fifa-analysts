@@ -12,6 +12,7 @@ const MODEL_NAMES: Record<string, string> = {
   ml: 'Gradient boosting',
   ensemble: 'Ensemble',
 }
+const MODEL_ORDER = ['elo', 'dixon_coles', 'ml', 'ensemble']
 
 export default function PredictPage({ groups }: { groups: GroupMeta[] }) {
   const [group, setGroup] = useState('international')
@@ -28,7 +29,6 @@ export default function PredictPage({ groups }: { groups: GroupMeta[] }) {
     [ready, home, away, group, neutral])
 
   const { data: backtest } = useApi(() => api.backtest(), [])
-  const MODEL_ORDER = ['elo', 'dixon_coles', 'ml', 'ensemble']
   const bt = (backtest?.results.filter((r) => r.rating_group === group) ?? [])
     .sort((a, b) => MODEL_ORDER.indexOf(a.model) - MODEL_ORDER.indexOf(b.model))
   const btHome = bt[0]?.baseline_home_accuracy

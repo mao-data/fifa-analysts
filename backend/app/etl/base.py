@@ -3,6 +3,23 @@
 (e.g. a live API once deployed outside the sandbox)."""
 from dataclasses import dataclass
 
+import requests
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
+
+
+def make_session(retries: int = 3) -> requests.Session:
+    """HTTP session with retry/backoff so a transient blip doesn't kill a
+    multi-minute refresh. Retries connection errors and 5xx/429 responses."""
+    session = requests.Session()
+    retry = Retry(total=retries, backoff_factor=1.5,
+                  status_forcelist=(429, 500, 502, 503, 504),
+                  allowed_methods=("GET",))
+    adapter = HTTPAdapter(max_retries=retry)
+    session.mount("https://", adapter)
+    session.mount("http://", adapter)
+    return session
+
 # Common club-name prefixes/suffixes that vary across seasons in the
 # openfootball data ("Tottenham Hotspur" vs "Tottenham Hotspur FC").
 # Stripping them gives one canonical name per club so Elo history and

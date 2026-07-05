@@ -165,6 +165,11 @@ def _migrate(conn: sqlite3.Connection) -> None:
         conn.execute(f"PRAGMA user_version = {SCHEMA_VERSION}")
 
 
+# Paths whose schema has been created/migrated in this process. API requests
+# open a fresh connection each time; the DDL only needs to run once per file.
+_initialized: set[str] = set()
+
+
 def get_conn(db_path: Path | str = DB_PATH) -> sqlite3.Connection:
     Path(db_path).parent.mkdir(parents=True, exist_ok=True)
     # check_same_thread=False: FastAPI may open and close a request's
@@ -172,6 +177,11 @@ def get_conn(db_path: Path | str = DB_PATH) -> sqlite3.Connection:
     # connection, so cross-thread sharing never actually happens.
     conn = sqlite3.connect(db_path, check_same_thread=False)
     conn.row_factory = sqlite3.Row
-    _migrate(conn)
-    conn.executescript(SCHEMA)
+    key = str(Path(db_path).resolve())
+    if key not in _initialized:
+        _migrate(conn)
+        conn.executescript(SCHEMA)
+        # WAL lets API reads proceed while an ETL refresh writes.
+        conn.execute("PRAGMA journal_mode=WAL")
+        _initialized.add(key)
     return conn

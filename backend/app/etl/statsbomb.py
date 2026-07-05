@@ -2,10 +2,15 @@
 
 Full event files run to several MB per match, so this ETL is a separate
 command (`python -m app.etl.cli statsbomb`), downloads one tournament at a
-time, and keeps only what the site needs: the match list and every shot
-(location, xG, outcome). ~50 shots per match instead of ~3,500 events.
+time (event files in parallel), and keeps only what the site needs: the match
+list and every shot (location, xG, outcome). ~50 shots per match instead of
+~3,500 events.
 """
-import requests
+from concurrent.futures import ThreadPoolExecutor
+
+from .base import make_session
+
+DOWNLOAD_WORKERS = 8
 
 BASE = "https://raw.githubusercontent.com/statsbomb/open-data/master/data"
 
@@ -18,13 +23,13 @@ TOURNAMENTS = [
 ]
 
 
-def _get(session: requests.Session, path: str):
+def _get(session, path: str):
     resp = session.get(f"{BASE}/{path}", timeout=120)
     resp.raise_for_status()
     return resp.json()
 
 
-def resolve_ids(session: requests.Session) -> list[tuple[int, int, str, str]]:
+def resolve_ids(session) -> list[tuple[int, int, str, str]]:
     comps = _get(session, "competitions.json")
     out = []
     for name, season in TOURNAMENTS:
@@ -71,18 +76,23 @@ def parse_shots(events: list[dict], match_id: int) -> list[tuple]:
 
 
 def refresh(conn, progress=print) -> int:
-    session = requests.Session()
+    session = make_session()
     total_shots = 0
     for comp_id, season_id, comp, season in resolve_ids(session):
         matches = _get(session, f"matches/{comp_id}/{season_id}.json")
         progress(f"[statsbomb] {comp} {season}: {len(matches)} matches")
         match_rows = [parse_match(m, comp, season) for m in matches]
+
+        def fetch_shots(m: dict) -> list[tuple]:
+            return parse_shots(_get(session, f"events/{m['match_id']}.json"),
+                               m["match_id"])
+
         shot_rows: list[tuple] = []
-        for i, m in enumerate(matches, 1):
-            events = _get(session, f"events/{m['match_id']}.json")
-            shot_rows.extend(parse_shots(events, m["match_id"]))
-            if i % 16 == 0:
-                progress(f"[statsbomb]   …{i}/{len(matches)} matches downloaded")
+        with ThreadPoolExecutor(max_workers=DOWNLOAD_WORKERS) as pool:
+            for i, shots in enumerate(pool.map(fetch_shots, matches), 1):
+                shot_rows.extend(shots)
+                if i % 24 == 0:
+                    progress(f"[statsbomb]   …{i}/{len(matches)} matches downloaded")
         with conn:
             conn.execute("DELETE FROM sb_shots WHERE match_id IN "
                          "(SELECT match_id FROM sb_matches WHERE competition = ? AND season = ?)",
